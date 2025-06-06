@@ -1,0 +1,21 @@
+# Ignore Python bytecode
+__pycache__/
+*.py[cod]
+
+# Ignore virtual environments
+.venv/
+venv/
+.idea/
+idea/
+
+# Ignore Django migrations
+**/migrations/
+*.sqlite3
+
+# VSCode settings (optional)
+.vscode/
+
+
+# OS-specific
+.DS_Store
+Thumbs.db 
