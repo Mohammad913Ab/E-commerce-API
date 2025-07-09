@@ -12,6 +12,8 @@ urlpatterns = [
     
     # Apps
     path('api/', include('accounts.urls')),
+    path('api/', include('products.urls')),
+    
     
     #SCHEMA
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

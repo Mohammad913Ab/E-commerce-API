@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-print('type of user', type(User))
+
 
 class BaseMobileUserSerializer(serializers.Serializer):
     mobile = serializers.CharField(max_length=11)
