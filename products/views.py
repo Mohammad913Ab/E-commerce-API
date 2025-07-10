@@ -30,9 +30,14 @@ class ProductViewSet(ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
     
     serializer_class = ProductSerializer
-    queryset = Product.objects.all()
     
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['title', 'description']
     ordering_fields = ['price', 'created_at']
     
+    def get_queryset(self):
+        return Product.objects.filter(is_delete=False, is_active=True)
+
+    def perform_destroy(self, instance):
+        instance.is_delete = True
+        instance.save()
