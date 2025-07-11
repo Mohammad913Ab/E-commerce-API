@@ -8,6 +8,9 @@ venv/
 .idea/
 idea/
 
+# Ignore media files
+media/
+
 # Ignore Django migrations
 **/migrations/
 *.sqlite3
