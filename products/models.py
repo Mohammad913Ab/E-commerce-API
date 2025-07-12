@@ -2,12 +2,26 @@ from django.utils.text import slugify
 from django.db import models
 from core.utils import product_image_upload_to
 
-class ProductCategory(models.Model):
+class BaseProduct(models.Model):
     title = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     is_delete = models.BooleanField(default=False)
+
+    class Meta:
+        abstract = True
+    
+    def save(self, *args, **kwargs) -> None:
+        if not self.slug:
+            self.slug = slugify(self.title)
+        super().save(*args, **kwargs)
+        
+    def __str__(self):
+        return self.title
+    
+        
+class ProductCategory(BaseProduct):
     parnt = models.ForeignKey(
         'self',
         models.CASCADE,
@@ -19,42 +33,14 @@ class ProductCategory(models.Model):
     class Meta:
         verbose_name_plural = "Categories"
         ordering = ['title']
-        
-    def save(self, *args, **kwargs) -> None:
-        if not self.slug:
-            self.slug = slugify(self.title)
-        super().save(*args, **kwargs)
     
-    def __str__(self):
-        return self.title
-
-class ProductTag(models.Model):
-    title = models.CharField(max_length=255, unique=True)
-    slug = models.SlugField(max_length=255, unique=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
-    is_delete = models.BooleanField(default=False)
-    
+class ProductTag(BaseProduct):
     class Meta:
         ordering = ['title']
         
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.title)
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.title
-
-
-class Product(models.Model):
-    title = models.CharField(max_length=255, unique=True)
-    slug = models.SlugField(max_length=255, unique=True, blank=True)
+class Product(BaseProduct):
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
-    is_delete = models.BooleanField(default=False)
 
     category = models.ForeignKey(
         ProductCategory,
@@ -68,20 +54,9 @@ class Product(models.Model):
         related_name='products',
         blank=True
     )
-
-    def save(self, *args, **kwargs) -> None:
-        if not self.slug:
-            self.slug = slugify(self.title)
-        super().save(*args, **kwargs)
-
-    
     
     class Meta:
         ordering = ['-created_at']
-    
-    def __str__(self):
-        return self.title
-
 
 class ProductImage(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
