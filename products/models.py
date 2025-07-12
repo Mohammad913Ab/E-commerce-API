@@ -2,6 +2,51 @@ from django.utils.text import slugify
 from django.db import models
 from core.utils import product_image_upload_to
 
+class ProductCategory(models.Model):
+    title = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    is_delete = models.BooleanField(default=False)
+    parnt = models.ForeignKey(
+        'self',
+        models.CASCADE,
+        related_name='children',
+        null=True,
+        blank=True
+    )
+    
+    class Meta:
+        verbose_name_plural = "Categories"
+        ordering = ['title']
+        
+    def save(self, *args, **kwargs) -> None:
+        if not self.slug:
+            self.slug = slugify(self.title)
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return self.title
+
+class ProductTag(models.Model):
+    title = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    is_delete = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['title']
+        
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.title)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.title
+
+
 class Product(models.Model):
     title = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
@@ -10,6 +55,19 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     is_delete = models.BooleanField(default=False)
+
+    category = models.ForeignKey(
+        ProductCategory,
+        on_delete=models.CASCADE,
+        related_name='products',
+        null=True,
+        blank=True
+    )
+    tags = models.ManyToManyField(
+        ProductTag,
+        related_name='products',
+        blank=True
+    )
 
     def save(self, *args, **kwargs) -> None:
         if not self.slug:
