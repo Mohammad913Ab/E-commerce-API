@@ -1,6 +1,10 @@
 from django.utils.text import slugify
 from django.db import models
 from core.utils import product_image_upload_to
+from django.contrib.auth import get_user_model
+from django.utils.text import Truncator
+
+User = get_user_model()
 
 class BaseProduct(models.Model):
     title = models.CharField(max_length=255, unique=True)
@@ -74,5 +78,26 @@ class ProductImage(models.Model):
     def __str__(self):
         # return <product-slug>: <img-name>
         return ': '.join(self.image.name.split('/')[1:])
+    
+    
+class ProductComment(models.Model):
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name='user_comments')
+    product = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_comments')
+    reply = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        related_name='replies',
+        null=True,
+        blank=True
+        )
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    is_delete = models.BooleanField(default=False)
+
+    def __str__(self):
+        return Truncator(self.text).words(4, truncate='...')
+
+
     
     
