@@ -58,6 +58,8 @@ class Product(BaseProduct):
         related_name='products',
         blank=True
     )
+    view_count = models.PositiveIntegerField(default=0)
+    like_count = models.PositiveIntegerField(default=0)
     
     class Meta:
         ordering = ['-created_at']
@@ -99,5 +101,21 @@ class ProductComment(models.Model):
         return Truncator(self.text).words(4, truncate='...')
 
 
+class ProductView(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='product_views')
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name='user_views')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.product}-{self.user}-{self.ip_address}'
+
+class ProductLike(models.Model):
+    product = models.ForeignKey(Product, models.CASCADE, related_name='likes')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='likes')
+    created_at = models.DateTimeField(auto_now_add=True)
     
+    def __str__(self):
+        return f'{self.product}-{self.user}'
+
     
