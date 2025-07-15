@@ -83,8 +83,8 @@ class ProductImage(models.Model):
     
     
 class ProductComment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name='user_comments')
-    product = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_comments')
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name='comments', blank=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='comments', blank=True)
     reply = models.ForeignKey(
         'self',
         on_delete=models.CASCADE,
