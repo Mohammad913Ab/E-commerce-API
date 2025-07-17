@@ -1,5 +1,5 @@
-from django.utils.safestring import mark_safe
 from django.contrib import admin
+from django.utils.safestring import mark_safe
 from .models import (
     Product,
     ProductComment,
@@ -7,81 +7,96 @@ from .models import (
     ProductImage,
     ProductLike,
     ProductTag,
-    ProductView
+    ProductView,
 )
 
+# -----------------------------------
+# Shared Base Classes
+# -----------------------------------
+
+class BaseAdmin(admin.ModelAdmin):
+    """Common options: readonly created_at, date hierarchy, ordering"""
+    readonly_fields = ('created_at',)
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+
+
+class ActiveDeleteAdmin(BaseAdmin):
+    """Adds is_active and is_delete filters"""
+    list_filter = ('is_active', 'is_delete', 'created_at')
+
+class SlugPrepoulatedFieldMixin:
+    prepopulated_fields = {'slug': ('title',)}
+
+
+# -----------------------------------
+# Inline Admin
+# -----------------------------------
 
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     max_num = 5
     extra = 1
     readonly_fields = ('created_at', 'image_preview')
-    
 
     def image_preview(self, obj):
         if obj.image:
             return mark_safe(f'<img src="{obj.image.url}" width="80" height="80" />')
         return 'No image'
-    
+    image_preview.short_description = 'Preview'
+
+
+# -----------------------------------
+# Model Admins
+# -----------------------------------
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(SlugPrepoulatedFieldMixin, ActiveDeleteAdmin):
     list_display = (
-        'title', 'slug', 'price', 'category', 'view_count', 'like_count',
-        'is_active', 'is_delete', 'created_at'
+        'title', 'slug', 'price', 'category',
+        'view_count', 'like_count', 'is_active', 'is_delete', 'created_at'
     )
-    list_filter = ('is_active', 'is_delete', 'category', 'created_at')
     search_fields = ('title', 'slug', 'description')
-    prepopulated_fields = {'slug': ('title',)}
     raw_id_fields = ('category',)
     filter_horizontal = ('tags',)
-    readonly_fields = ('created_at', 'view_count', 'like_count')
-    date_hierarchy = 'created_at'
-    ordering = ('-created_at',)
-    
+    readonly_fields = ActiveDeleteAdmin.readonly_fields + ('view_count', 'like_count')
     inlines = [ProductImageInline]
 
+
 @admin.register(ProductComment)
-class ProductCommentAdmin(admin.ModelAdmin):
+class ProductCommentAdmin(BaseAdmin):
     list_display = ('user', 'product', 'short_text', 'reply', 'created_at', 'is_active', 'is_delete')
     list_filter = ('is_active', 'is_delete', 'created_at')
-    search_fields = ('text', 'user__username', 'product__name')
-    readonly_fields = ('created_at',)
-    date_hierarchy = 'created_at'
-    ordering = ('-created_at',)
+    search_fields = ('text', 'user__username', 'product__title')
 
     @admin.display(description='Comment')
     def short_text(self, obj):
-        return str(obj)  # __str__ method of object
+        return str(obj)
+
 
 @admin.register(ProductCategory)
-class ProductCategoryAdmin(admin.ModelAdmin):
+class ProductCategoryAdmin(ActiveDeleteAdmin):
     list_display = ('title', 'slug', 'parnt', 'is_active', 'is_delete', 'created_at')
-    list_filter = ('is_active', 'is_delete', 'created_at')
     search_fields = ('title', 'slug')
     ordering = ('title',)
-    
+
+
 @admin.register(ProductTag)
-class ProductTagAdmin(admin.ModelAdmin):
+class ProductTagAdmin(SlugPrepoulatedFieldMixin, ActiveDeleteAdmin):
     list_display = ('title', 'slug', 'is_active', 'is_delete', 'created_at')
-    list_filter = ('is_active', 'is_delete', 'created_at')
     search_fields = ('title', 'slug')
-    prepopulated_fields = {'slug': ('title',)}
     ordering = ('title',)
-    readonly_fields = ('created_at',)
 
 
 @admin.register(ProductView)
-class ProductViewAdmin(admin.ModelAdmin):
+class ProductViewAdmin(BaseAdmin):
     list_display = ('product', 'user', 'ip_address', 'created_at')
-    list_filter = ('created_at',)
     search_fields = ('product__title', 'user__username', 'ip_address')
-    readonly_fields = ('created_at',)
+    list_filter = ('created_at',)
 
 
 @admin.register(ProductLike)
-class ProductLikeAdmin(admin.ModelAdmin):
+class ProductLikeAdmin(BaseAdmin):
     list_display = ('product', 'user', 'created_at')
-    list_filter = ('created_at',)
     search_fields = ('product__title', 'user__username')
-    readonly_fields = ('created_at',)
+    list_filter = ('created_at',)
