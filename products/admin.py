@@ -53,3 +53,10 @@ class ProductCommentAdmin(admin.ModelAdmin):
     @admin.display(description='Comment')
     def short_text(self, obj):
         return str(obj)  # __str__ method of object
+
+@admin.register(ProductCategory)
+class ProductCategoryAdmin(admin.ModelAdmin):
+    list_display = ('title', 'slug', 'parnt', 'is_active', 'is_delete', 'created_at')
+    list_filter = ('is_active', 'is_delete', 'created_at')
+    search_fields = ('title', 'slug')
+    ordering = ('title',)
