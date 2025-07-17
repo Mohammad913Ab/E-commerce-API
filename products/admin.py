@@ -60,3 +60,28 @@ class ProductCategoryAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'is_delete', 'created_at')
     search_fields = ('title', 'slug')
     ordering = ('title',)
+    
+@admin.register(ProductTag)
+class ProductTagAdmin(admin.ModelAdmin):
+    list_display = ('title', 'slug', 'is_active', 'is_delete', 'created_at')
+    list_filter = ('is_active', 'is_delete', 'created_at')
+    search_fields = ('title', 'slug')
+    prepopulated_fields = {'slug': ('title',)}
+    ordering = ('title',)
+    readonly_fields = ('created_at',)
+
+
+@admin.register(ProductView)
+class ProductViewAdmin(admin.ModelAdmin):
+    list_display = ('product', 'user', 'ip_address', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('product__title', 'user__username', 'ip_address')
+    readonly_fields = ('created_at',)
+
+
+@admin.register(ProductLike)
+class ProductLikeAdmin(admin.ModelAdmin):
+    list_display = ('product', 'user', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('product__title', 'user__username')
+    readonly_fields = ('created_at',)
