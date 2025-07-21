@@ -118,4 +118,44 @@ class ProductLike(models.Model):
     def __str__(self):
         return f'{self.product}-{self.user}'
 
-    
+# -- Attribiute --
+
+class Attribute(models.Model):
+    title = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Attribute'
+        verbose_name_plural = 'Attributes'
+
+    def __str__(self):
+        return self.title
+
+
+class AttributeValue(models.Model):
+    attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE, related_name='values')
+    value = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('attribute', 'value')
+        verbose_name = 'Attribute Value'
+        verbose_name_plural = 'Attribute Values'
+
+    def __str__(self):
+        return f"{self.attribute.title}: {self.value}"
+
+
+class ProductAttributeValue(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='attributes')
+    attribute_value = models.ForeignKey(AttributeValue, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('product', 'attribute_value')
+        verbose_name = 'Product Attribute Value'
+        verbose_name_plural = 'Product Attribute Values'
+
+    def __str__(self):
+        return f"{self.product.title} - {self.attribute_value}"
