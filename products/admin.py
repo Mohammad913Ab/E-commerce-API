@@ -8,6 +8,9 @@ from .models import (
     ProductLike,
     ProductTag,
     ProductView,
+    Attribute,
+    AttributeValue,
+    ProductAttributeValue
 )
 
 # -----------------------------------
@@ -45,6 +48,12 @@ class ProductImageInline(admin.TabularInline):
         return 'No image'
     image_preview.short_description = 'Preview'
 
+class ProductAttributeValueInline(admin.TabularInline):
+    model = ProductAttributeValue
+    extra = 1
+    raw_id_fields = ('attribute_value', )
+    verbose_name = 'Attribute'
+    verbose_name_plural = 'Attributes'
 
 # -----------------------------------
 # Model Admins
@@ -60,7 +69,7 @@ class ProductAdmin(SlugPrepoulatedFieldMixin, ActiveDeleteAdmin):
     raw_id_fields = ('category',)
     filter_horizontal = ('tags',)
     readonly_fields = ActiveDeleteAdmin.readonly_fields + ('view_count', 'like_count')
-    inlines = [ProductImageInline]
+    inlines = [ProductImageInline, ProductAttributeValueInline]
 
 
 @admin.register(ProductComment)
@@ -100,3 +109,14 @@ class ProductLikeAdmin(BaseAdmin):
     list_display = ('product', 'user', 'created_at')
     search_fields = ('product__title', 'user__username')
     list_filter = ('created_at',)
+
+@admin.register(AttributeValue)
+class AttributeValueAdmin(BaseAdmin):
+    search_fields = ('value', 'attribute__title')
+    list_filter = ('attribute__title', )
+    raw_id_fields = ('attribute', )
+
+@admin.register(Attribute)
+class AttributeAdmin(SlugPrepoulatedFieldMixin, BaseAdmin):
+    search_fields = ('title', 'slug')
+    
