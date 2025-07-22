@@ -5,6 +5,8 @@ from rest_framework.test import APIClient
 
 from products.models import ProductComment
 
+from products.models import Attribute, AttributeValue, ProductAttributeValue
+
 @pytest.mark.django_db
 class TestProductApi:
     def test_product_detail(self, api_client, product):
@@ -56,3 +58,12 @@ class TestProductApi:
         assert 'text' in res.data
         comment = ProductComment.objects.filter(product=product, user=user, text='Comment Test (1)').first()
         assert comment is not None
+    
+    def test_product_attributes(self, product):
+        attribute = Attribute.objects.create(title='Color', slug='color')
+        attribute_value = AttributeValue.objects.create(value='Red', attribute=attribute)
+        product_attribute_value = ProductAttributeValue.objects.create(
+            product=product,attribute_value=attribute_value
+        )
+        assert product_attribute_value in product.attributes.all()
+        assert 'Red' == AttributeValue.objects.get(attribute__title='Color').value
