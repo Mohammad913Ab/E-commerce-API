@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     # Apps
     'products.apps.ProductsConfig',
     'accounts.apps.AccountsConfig',
+    'carts.apps.CartsConfig',
     # External pack
     'rest_framework',
     'rest_framework_simplejwt',
