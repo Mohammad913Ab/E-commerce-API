@@ -5,9 +5,7 @@ from rest_framework.response import Response
 from .models import Cart, CartItem
 from .serializers import CartSerializer, CartItemSerializer
 
-class IsOwner(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return obj.user == request.user
+from core.permissions import IsOwner
 
 class CartViewSet(viewsets.ModelViewSet):
     serializer_class = CartSerializer
