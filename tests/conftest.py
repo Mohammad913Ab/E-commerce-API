@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 import pytest
 
 from products.models import Product
+from carts.models import Cart
 
 User = get_user_model()
 
@@ -28,3 +29,7 @@ def user_factory(db):
     def create_user(**kwargs):
         return User.objects.create(**kwargs)
     return create_user
+
+@pytest.fixture
+def cart(db, user):
+    return Cart.objects.create(user=user)

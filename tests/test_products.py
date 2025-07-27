@@ -28,8 +28,10 @@ class TestProductApi:
     def test_unauthenticated_user_cannot_like(self, api_client, product):
         url = reverse('product-like', kwargs={'pk': product.id})
         res = api_client.post(url)
-        assert res.status_code == status.HTTP_401_UNAUTHORIZED or status.HTTP_403_FORBIDDEN
-        
+        assert (
+            res.status_code == status.HTTP_401_UNAUTHORIZED or 
+            res.status_code == status.HTTP_403_FORBIDDEN
+        )
     def test_user_can_like_product_once(self, api_client, user, product):
         url = reverse('product-like', kwargs={'pk': product.id})
         
@@ -46,8 +48,11 @@ class TestProductApi:
     def test_unauthenticated_user_cannot_comment(self, api_client, product):
         url = reverse('product-comment', kwargs={'pk': product.id})
         res = api_client.post(url)
-        assert res.status_code == status.HTTP_401_UNAUTHORIZED or status.HTTP_403_FORBIDDEN
-
+        assert (
+            res.status_code == status.HTTP_401_UNAUTHORIZED or 
+            res.status_code == status.HTTP_403_FORBIDDEN
+        )
+        
     def test_user_can_like_product(self, api_client:APIClient, user, product):
         url = reverse('product-comment', kwargs={'pk': product.id})
         
