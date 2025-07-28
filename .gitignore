@@ -15,6 +15,10 @@ media/
 **/migrations/
 *.sqlite3
 
+# Ignore pytest-cov file
+.coverage
+
+
 # VSCode settings (optional)
 .vscode/
 
