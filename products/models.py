@@ -45,6 +45,7 @@ class ProductTag(BaseProduct):
 class Product(BaseProduct):
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=0)
 
     category = models.ForeignKey(
         ProductCategory,
@@ -117,6 +118,15 @@ class ProductLike(models.Model):
     
     def __str__(self):
         return f'{self.product}-{self.user}'
+
+class ProductInventory(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventory_logs')
+    change = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.product.title}: {self.change}'
+    
 
 # -- Attribiute --
 
