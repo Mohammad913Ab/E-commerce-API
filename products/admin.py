@@ -10,7 +10,8 @@ from .models import (
     ProductView,
     Attribute,
     AttributeValue,
-    ProductAttributeValue
+    ProductAttributeValue,
+    ProductInventory
 )
 
 # -----------------------------------
@@ -55,6 +56,18 @@ class ProductAttributeValueInline(admin.TabularInline):
     verbose_name = 'Attribute'
     verbose_name_plural = 'Attributes'
 
+class ProductInventoryInline(admin.TabularInline):
+    model = ProductInventory
+    extra = 1
+    max_num = 1
+    fields = ('change', )
+    verbose_name = 'Inventory'
+    verbose_name_plural = 'Inventories'
+
+    def get_queryset(self, request):
+        return self.model.objects.none()
+    
+
 # -----------------------------------
 # Model Admins
 # -----------------------------------
@@ -62,14 +75,18 @@ class ProductAttributeValueInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(SlugPrepoulatedFieldMixin, ActiveDeleteAdmin):
     list_display = (
-        'title', 'slug', 'price', 'category',
+        'title', 'slug', 'price', 'category', 'quantity',
         'view_count', 'like_count', 'is_active', 'is_delete', 'created_at'
     )
     search_fields = ('title', 'slug', 'description')
     raw_id_fields = ('category',)
     filter_horizontal = ('tags',)
-    readonly_fields = ActiveDeleteAdmin.readonly_fields + ('view_count', 'like_count')
-    inlines = [ProductImageInline, ProductAttributeValueInline]
+    readonly_fields = ActiveDeleteAdmin.readonly_fields + ('view_count', 'like_count', 'quantity')
+    inlines = [
+        ProductImageInline,
+        ProductAttributeValueInline,
+        ProductInventoryInline
+        ]
 
 
 @admin.register(ProductComment)
@@ -119,4 +136,9 @@ class AttributeValueAdmin(BaseAdmin):
 @admin.register(Attribute)
 class AttributeAdmin(SlugPrepoulatedFieldMixin, BaseAdmin):
     search_fields = ('title', 'slug')
-    
+
+@admin.register(ProductInventory)
+class ProductInventoryAdmin(BaseAdmin):
+    list_display = ('product__title', 'change', 'created_at')
+    list_filter = ('product', 'created_at')
+    ordering = ('change', )

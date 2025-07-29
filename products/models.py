@@ -1,8 +1,9 @@
 from django.utils.text import slugify
 from django.db import models
-from core.utils import product_image_upload_to
 from django.contrib.auth import get_user_model
 from django.utils.text import Truncator
+from django.core.exceptions import ValidationError
+from core.utils import product_image_upload_to
 
 User = get_user_model()
 
@@ -124,9 +125,23 @@ class ProductInventory(models.Model):
     change = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ('created_at', )
+        verbose_name = 'Inventory'
+        verbose_name_plural = 'Inventories'
+
     def __str__(self):
         return f'{self.product.title}: {self.change}'
     
+    def clean(self):
+        new_quantity = self.product.quantity + self.change
+        if new_quantity < 0:
+            raise ValidationError({'change': 'The product quantity cannot be less than 0.'})
+    
+    def save(self, *args, **kwargs):
+        self.product.quantity += self.change
+        self.product.save(update_fields=['quantity'])
+        return super().save(*args, **kwargs)
 
 # -- Attribiute --
 
