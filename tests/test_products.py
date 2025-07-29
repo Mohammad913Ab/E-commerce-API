@@ -1,12 +1,13 @@
+from rest_framework.test import APIClient
 from rest_framework import status
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 import pytest
-from rest_framework.test import APIClient
 
-from products.models import ProductComment
-
-from products.models import Attribute, AttributeValue, ProductAttributeValue
-
+from products.models import (
+    Attribute, AttributeValue, ProductAttributeValue, ProductComment,
+    ProductInventory, Product
+)
 @pytest.mark.django_db
 class TestProductApi:
     def test_product_detail(self, api_client, product):
@@ -72,3 +73,28 @@ class TestProductApi:
         )
         assert product_attribute_value in product.attributes.all()
         assert 'Red' == AttributeValue.objects.get(attribute__title='Color').value
+
+    def test_inventory_prevents_negative_product_quantity(self, product):
+        assert product.quantity == 0
+
+        with pytest.raises(ValidationError) as exc_info:
+            inventory = ProductInventory(product=product, change=-1)
+            inventory.full_clean()
+            inventory.save()
+        
+        assert 'The product quantity cannot be less than 0.' in str(exc_info)
+        product.refresh_from_db()
+        assert product.quantity == 0
+    
+    def test_inventory_plus_minus(self, product):
+        inventory_plus_3 = ProductInventory.objects.create(product=product, change=3)
+        product = Product.objects.get(id=product.id)
+        assert product.quantity == 3
+        inventory_minus_1 = ProductInventory.objects.create(product=product, change=-1)
+        product = Product.objects.get(id=product.id)
+        assert product.quantity == 2
+        assert inventory_minus_1 in product.inventory_logs.all()
+        assert inventory_plus_3 in product.inventory_logs.all()
+        
+        
+        
