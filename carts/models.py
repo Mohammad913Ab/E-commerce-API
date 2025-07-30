@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils import timezone
+from django.utils.timezone import timedelta
+from django.core.exceptions import ValidationError
 
 from products.models import Product
 
@@ -35,3 +37,54 @@ class CartItem(models.Model):
     @property
     def total_price(self):
         return self.product.price * self.quantity
+
+class Discount(models.Model):
+    class DiscountTypes(models.TextChoices):
+        PERCENTAGE = ('P', 'Percentage')
+        FIXED = ('F', 'Fixed amount')
+
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    expired_at = models.DateTimeField()
+    discount_value = models.FloatField(
+        help_text="Enter the discount amount. If the type is 'Percentage', provide a number "
+        "between 0 and 100. If it's 'Fixed amount', enter the exact value to subtract from the price."
+        )
+    discount_type = models.CharField(
+        choices=DiscountTypes.choices,
+        default=DiscountTypes.PERCENTAGE,
+        max_length=1,
+        help_text="Select the type of discount. 'Percentage' deducts a "
+        "percentage of the original price. 'Fixed amount' deducts a constant value."
+        )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('expired_at')
+        abstract = True
+
+    @property
+    def expires_in(self):
+        zero_delta = timedelta(0)
+        if not self.is_active:
+            return zero_delta
+        
+        dif = self.expired_at - self.created_at
+        if dif <= zero_delta:
+            self.is_active = False
+            self.save(update_fields=['is_active'])
+            return zero_delta
+        return dif
+
+    def clean(self):
+        if self.discount_type == self.DiscountTypes.PERCENTAGE and self.discount_value > 100:
+            raise ValidationError({
+                'discount_value': "Discount value cant upper than 100 while discount type is 'precentage'"
+                })
+        if self.expires_in < 0:
+            raise ValidationError({
+                'expired_at': "The expiration date of the discount cannot be before the present time."
+                })
+    
+    def __str__(self):
+        return f'({self.discount_value}, {self.discount_type})'
