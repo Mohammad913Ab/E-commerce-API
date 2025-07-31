@@ -38,12 +38,12 @@ class CartItem(models.Model):
     def total_price(self):
         return self.product.price * self.quantity
 
-class Discount(models.Model):
+class DiscountCode(models.Model):
     class DiscountTypes(models.TextChoices):
         PERCENTAGE = ('P', 'Percentage')
         FIXED = ('F', 'Fixed amount')
 
-
+    title = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     expired_at = models.DateTimeField()
     discount_value = models.FloatField(
@@ -58,10 +58,10 @@ class Discount(models.Model):
         "percentage of the original price. 'Fixed amount' deducts a constant value."
         )
     is_active = models.BooleanField(default=True)
+    max_uses = models.PositiveIntegerField(default=100)
 
     class Meta:
         ordering = ('expired_at')
-        abstract = True
 
     @property
     def expires_in(self):
@@ -87,4 +87,12 @@ class Discount(models.Model):
                 })
     
     def __str__(self):
-        return f'({self.discount_value}, {self.discount_type})'
+        return self.title
+
+class CartDiscountUse(models.Model):
+    cart = models.OneToOneField(Cart, on_delete=models.CASCADE, related_name='discount')
+    code = models.ForeignKey(DiscountCode, related_name='used_on', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.cart.user}: {self.code.title}"
