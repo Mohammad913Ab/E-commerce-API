@@ -44,6 +44,7 @@ class DiscountCode(models.Model):
         FIXED = ('F', 'Fixed amount')
 
     title = models.CharField(max_length=255)
+    code = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expired_at = models.DateTimeField()
     discount_value = models.FloatField(
@@ -58,10 +59,11 @@ class DiscountCode(models.Model):
         "percentage of the original price. 'Fixed amount' deducts a constant value."
         )
     is_active = models.BooleanField(default=True)
-    max_uses = models.PositiveIntegerField(default=100)
+    can_uses = models.PositiveIntegerField(default=100)
+    use_count = models.PositiveIntegerField(default=0, editable=False)
 
     class Meta:
-        ordering = ('expired_at')
+        ordering = ('expired_at', )
 
     @property
     def expires_in(self):
@@ -69,7 +71,7 @@ class DiscountCode(models.Model):
         if not self.is_active:
             return zero_delta
         
-        dif = self.expired_at - self.created_at
+        dif = self.expired_at - timezone.now()
         if dif <= zero_delta:
             self.is_active = False
             self.save(update_fields=['is_active'])
@@ -81,7 +83,7 @@ class DiscountCode(models.Model):
             raise ValidationError({
                 'discount_value': "Discount value cant upper than 100 while discount type is 'precentage'"
                 })
-        if self.expires_in < 0:
+        if not self.expired_at - timezone.now():
             raise ValidationError({
                 'expired_at': "The expiration date of the discount cannot be before the present time."
                 })
