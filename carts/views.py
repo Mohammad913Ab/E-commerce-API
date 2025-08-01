@@ -43,9 +43,9 @@ class CartViewSet(viewsets.ModelViewSet):
     def update_item_quantity(self, request, pk=None):
         cart = self.get_object()
         product_id = request.data.get('product_id')
-        quantity = int(request.data.get('quantity'))
+        quantity = int(request.data.get('quantity', -1))
 
-        if not product_id or quantity is None:
+        if not product_id or quantity < 0:
             return Response({'error': 'product_id and quantity required'}, status=400)
 
         try:

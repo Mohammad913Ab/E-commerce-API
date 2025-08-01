@@ -9,6 +9,11 @@ User = get_user_model()
 
 @pytest.mark.django_db
 class TestCartApi:
+    def test_create_cart_and_cart_item(self, cart, product):
+        assert str(cart) == "Cart #1 for 09986543342"
+        item = CartItem.objects.create(cart=cart, product=product)
+        assert str(item) == "1 × ProductTest (1)"
+
     def test_unauthenticated_user_create_cart(self, api_client):
         url = reverse('cart-list')
         res = api_client.post(url)
@@ -16,6 +21,7 @@ class TestCartApi:
             res.status_code == status.HTTP_401_UNAUTHORIZED or 
             res.status_code == status.HTTP_403_FORBIDDEN
         )
+        
     def test_authenticated_user_create_cart(self, api_client, user):
         url = reverse('cart-list')
         api_client.force_authenticate(user=user)
@@ -65,3 +71,14 @@ class TestCartApi:
         res = api_client.post(url, data={'product_id': product.id, 'quantity': 0})
         assert res.status_code == status.HTTP_200_OK
         assert not len(res.data['items'])
+
+        # Quantity or product id not send in request
+        res = api_client.post(url, data={'product_id': product.id})
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+        assert res.data['error'] == 'product_id and quantity required'
+
+        # Item does not exists
+        res = api_client.post(url, data={'product_id': product.id, 'quantity': 2})
+        assert res.status_code == status.HTTP_404_NOT_FOUND
+        assert res.data['error'] == 'Item does not exist'
+
