@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from products.serializers import ProductSerializer
 from products.models import Product
 
-from .models import CartItem, Cart
+from .models import CartItem, Cart, CartDiscountUse
 
 class CartItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
@@ -41,4 +41,9 @@ class CartSerializer(serializers.ModelSerializer):
         for item in items_data:
             CartItem.objects.create(cart=instance, **item)
         return instance
-        
+    
+class DiscountUseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CartDiscountUse
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at')
