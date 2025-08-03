@@ -24,8 +24,8 @@ class CartSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Cart
-        fields = ('id', 'user', 'items', 'total_price', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'user', 'total_price', 'created_at', 'updated_at')
+        fields = ('id', 'user', 'items', 'total_price', 'created_at', 'updated_at', 'discount')
+        read_only_fields = ('id', 'user', 'total_price', 'created_at', 'updated_at', 'discount')
         
         
     def create(self, validated_data):
@@ -43,7 +43,20 @@ class CartSerializer(serializers.ModelSerializer):
         return instance
     
 class DiscountUseSerializer(serializers.ModelSerializer):
+    cart = CartSerializer(read_only=True)
+    cart_id = serializers.PrimaryKeyRelatedField(
+        queryset=Cart.objects.all(), write_only=True, source='cart'
+    )
+    
     class Meta:
         model = CartDiscountUse
-        fields = '__all__'
-        read_only_fields = ('id', 'created_at')
+        fields = ('id', 'cart', 'cart_id', 'code', 'created_at')
+        read_only_fields = ('id', 'cart', 'created_at')
+
+    def create(self, validated_data):
+        instance, created = CartDiscountUse.objects.get_or_create(
+            cart_id=validated_data['cart'],
+        )
+        instance.code = validated_data['code']
+        instance.save()
+        return instance

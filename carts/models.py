@@ -44,7 +44,7 @@ class DiscountCode(models.Model):
         FIXED = ('F', 'Fixed amount')
 
     title = models.CharField(max_length=255)
-    code = models.CharField(max_length=255, unique=True)
+    code = models.CharField(max_length=255, unique=True, primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expired_at = models.DateTimeField()
     discount_value = models.FloatField(

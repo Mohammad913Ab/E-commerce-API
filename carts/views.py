@@ -1,9 +1,12 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from django.core.exceptions import ValidationError
 
 from .models import Cart, CartItem
-from .serializers import CartSerializer, CartItemSerializer
+from .serializers import CartSerializer, CartItemSerializer, DiscountUseSerializer
 
 from core.permissions import IsOwner
 
@@ -22,13 +25,17 @@ class CartViewSet(viewsets.ModelViewSet):
         cart = self.get_object()
         serializer = CartItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        product = serializer.validated_data.get('product')
+        quantity = serializer.validated_data.get('quantity', 1)
+        if not product:
+            return Response({'error': 'product is none'}, status=status.HTTP_400_BAD_REQUEST)
         item, created = CartItem.objects.get_or_create(
             cart=cart,
-            product=serializer.validated_data['product'],
-            defaults={'quantity': serializer.validated_data['quantity']}
+            product=product,
+            defaults={'quantity': quantity}
         )
         if not created:
-            item.quantity += serializer.validated_data['quantity']
+            item.quantity += quantity
             item.save()
         return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
 
@@ -59,3 +66,13 @@ class CartViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Item does not exist'}, status=404)
 
         return Response(CartSerializer(cart).data)
+
+
+class DiscountApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
+    
+    def post(self, request):
+        serializer = DiscountUseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.create(validated_data=serializer.validated_data)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
