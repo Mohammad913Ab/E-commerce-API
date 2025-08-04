@@ -74,5 +74,12 @@ class DiscountApiView(APIView):
     def post(self, request):
         serializer = DiscountUseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        code = serializer.validated_data['code']
+        if code.can_uses < 1:
+            return Response({'error': 'This discount code has reached its maximum usage limit and can no longer be used.'})
+        if not code.expires_in:
+            return Response({'error': 'This discount code has expired and is no longer valid.'})
+        
         serializer.create(validated_data=serializer.validated_data)
         return Response(data=serializer.data, status=status.HTTP_200_OK)

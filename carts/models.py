@@ -21,7 +21,16 @@ class Cart(models.Model):
 
     @property
     def total_price(self):
-        return sum(item.total_price for item in self.items.all())
+        total_product_price = int(sum(item.total_price for item in self.items.all()))
+        discount = self.discount.code
+        
+        if not discount:
+            return total_product_price
+        print(f'{total_product_price=}\n{discount.discount_value=}')
+        if discount.discount_type == 'F':
+            return int(total_product_price - discount.discount_value)
+        
+        return total_product_price - (total_product_price * discount.discount_value / 100)
 
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')

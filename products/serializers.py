@@ -6,7 +6,7 @@ class ProductSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Product
-        exclude = ('is_active', 'is_delete')
+        exclude = ('is_active', 'is_delete', 'quantity')
         
     def get_comments(self, obj):
         comments = obj.comments.filter(is_active=True, is_delete=False, reply__isnull=True)

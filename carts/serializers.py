@@ -57,6 +57,14 @@ class DiscountUseSerializer(serializers.ModelSerializer):
         instance, created = CartDiscountUse.objects.get_or_create(
             cart_id=validated_data['cart'],
         )
-        instance.code = validated_data['code']
+        code = validated_data['code']
+
+        instance.code = code
         instance.save()
+        
+        if created:
+            code.use_count += 1
+            code.can_uses -= 1
+            code.save()
+
         return instance
