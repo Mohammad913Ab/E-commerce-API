@@ -1,10 +1,13 @@
 from rest_framework.test import APIClient
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from django.utils.timezone import timedelta
+
 import pytest
 
 from products.models import Product
-from carts.models import Cart
+from carts.models import Cart, DiscountCode
 
 User = get_user_model()
 
@@ -33,3 +36,18 @@ def user_factory(db):
 @pytest.fixture
 def cart(db, user):
     return Cart.objects.create(user=user)
+
+@pytest.fixture
+def discount_code(db):
+    return DiscountCode.objects.create(
+            title='DiscountCode 1',
+            code='#123',
+            expired_at=timezone.now() + timedelta(hours=1),
+            discount_value=100,
+            discount_type='F'
+            )
+@pytest.fixture
+def discount_code_factory(db):
+    def create_discount_code(**kwargs):
+        return DiscountCode.objects.create(**kwargs)
+    return create_discount_code

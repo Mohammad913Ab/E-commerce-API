@@ -92,7 +92,7 @@ class DiscountCode(models.Model):
             raise ValidationError({
                 'discount_value': "Discount value cant upper than 100 while discount type is 'precentage'"
                 })
-        if not self.expired_at - timezone.now():
+        if self.expired_at < timezone.now():
             raise ValidationError({
                 'expired_at': "The expiration date of the discount cannot be before the present time."
                 })

@@ -1,5 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.timezone import timedelta
+from django.core.exceptions import ValidationError
 from rest_framework import status
 import pytest
 
@@ -82,3 +85,40 @@ class TestCartApi:
         assert res.status_code == status.HTTP_404_NOT_FOUND
         assert res.data['error'] == 'Item does not exist'
 
+    # Discount test
+    def test_discount_create(self, discount_code, discount_code_factory):
+        assert str(discount_code.title) == 'DiscountCode 1'
+
+        discount_code.delete()
+
+        with pytest.raises(ValidationError) as exc_info:
+            new_discount_code = discount_code_factory(
+                title='DiscountCode',
+                code='#123',
+                expired_at=timezone.now() + timedelta(hours=1),
+                discount_value=101,
+                discount_type='P'
+            )
+            new_discount_code.full_clean()
+            new_discount_code.save()
+            
+        assert "Discount value cant upper than 100 while discount type is 'precentage'" in str(exc_info)
+        new_discount_code.delete()
+        
+        with pytest.raises(ValidationError) as exc_info:
+            new_discount_code = discount_code_factory(
+                title='DiscountCode',
+                code='#123',
+                expired_at=timezone.now() - timedelta(hours=1),
+                discount_value=90,
+                discount_type='P'
+            )
+            new_discount_code.full_clean()
+            new_discount_code.save()
+
+        assert "The expiration date of the discount cannot be before the present time." in str(exc_info)
+
+    def test_discount_expired(self, discount_code):
+        assert discount_code.expires_in
+        discount_code.expired_at = timezone.now() - timedelta(minutes=5)
+        assert not discount_code.expires_in
