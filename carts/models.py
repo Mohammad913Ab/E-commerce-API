@@ -22,11 +22,12 @@ class Cart(models.Model):
     @property
     def total_price(self):
         total_product_price = int(sum(item.total_price for item in self.items.all()))
-        discount = self.discount.code
         
-        if not discount:
+        if not hasattr(self, 'discount'):
             return total_product_price
-        print(f'{total_product_price=}\n{discount.discount_value=}')
+
+        discount = self.discount.code
+
         if discount.discount_type == 'F':
             return int(total_product_price - discount.discount_value)
         

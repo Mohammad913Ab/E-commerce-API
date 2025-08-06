@@ -14,13 +14,19 @@ User = get_user_model()
 @pytest.fixture
 def user(db):
     return User.objects.create(mobile='09986543342', password='Zxcvbnm@123')
-    
+
 @pytest.fixture
 def product(db):
     return Product.objects.create(
         title="ProductTest (1)",
         price=100
     )
+
+@pytest.fixture
+def product_factory(db):
+    def create(**kwargs):
+        return Product.objects.create(**kwargs)        
+    return create
 
 @pytest.fixture
 def api_client():
@@ -46,6 +52,7 @@ def discount_code(db):
             discount_value=100,
             discount_type='F'
             )
+
 @pytest.fixture
 def discount_code_factory(db):
     def create_discount_code(**kwargs):

@@ -6,16 +6,22 @@ from django.core.exceptions import ValidationError
 from rest_framework import status
 import pytest
 
-from carts.models import Cart, CartItem
+from carts.models import Cart, CartItem, CartDiscountUse
 
 User = get_user_model()
 
 @pytest.mark.django_db
 class TestCartApi:
-    def test_create_cart_and_cart_item(self, cart, product):
+    def test_create_cart_and_cart_item(self, cart, product, product_factory):
         assert str(cart) == "Cart #1 for 09986543342"
         item = CartItem.objects.create(cart=cart, product=product)
         assert str(item) == "1 × ProductTest (1)"
+
+        # Test total price
+        new_product = product_factory(title='New Product', price=110)
+        CartItem.objects.create(cart=cart, product=new_product, quantity=2)
+        cart = Cart.objects.get(id=cart.id)
+        assert cart.total_price == 320
 
     def test_unauthenticated_user_create_cart(self, api_client):
         url = reverse('cart-list')
@@ -120,5 +126,28 @@ class TestCartApi:
 
     def test_discount_expired(self, discount_code):
         assert discount_code.expires_in
+        assert str(discount_code) == 'DiscountCode 1'
         discount_code.expired_at = timezone.now() - timedelta(minutes=5)
         assert not discount_code.expires_in
+
+    def test_total_price_with_discount(self, discount_code, cart, product_factory):
+        product = product_factory(title='New Product', price=300)
+        CartItem.objects.create(cart=cart, product=product, quantity=4)
+        discount_use = CartDiscountUse.objects.create(cart=cart, code=discount_code)
+        
+        assert str(discount_use) == '09986543342: DiscountCode 1'
+        
+        cart = Cart.objects.get(id=cart.id)
+        # For Fixed amount
+        assert cart.total_price == 1100
+        # For Percentage
+        discount_code.discount_type = 'P'
+        discount_code.save()
+        cart = Cart.objects.get(id=cart.id)
+        assert cart.total_price == 0
+        
+        # Test with DiscountCode.is_active = False
+        discount_code.is_active = False
+        discount_code.save()
+        assert discount_code.expires_in == timedelta(0)
+        
