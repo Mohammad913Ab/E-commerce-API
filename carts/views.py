@@ -20,53 +20,6 @@ class CartViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    @action(detail=True, methods=['post'])
-    def add_item(self, request, pk=None):
-        cart = self.get_object()
-        serializer = CartItemSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        product = serializer.validated_data.get('product')
-        quantity = serializer.validated_data.get('quantity', 1)
-        if not product:
-            return Response({'error': 'product is none'}, status=status.HTTP_400_BAD_REQUEST)
-        item, created = CartItem.objects.get_or_create(
-            cart=cart,
-            product=product,
-            defaults={'quantity': quantity}
-        )
-        if not created:
-            item.quantity += quantity
-            item.save()
-        return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['post'])
-    def remove_item(self, request, pk=None):
-        cart = self.get_object()
-        product_id = request.data.get('product_id')
-        CartItem.objects.filter(cart=cart, product_id=product_id).delete()
-        return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['post'])
-    def update_item_quantity(self, request, pk=None):
-        cart = self.get_object()
-        product_id = request.data.get('product_id')
-        quantity = int(request.data.get('quantity', -1))
-
-        if not product_id or quantity < 0:
-            return Response({'error': 'product_id and quantity required'}, status=400)
-
-        try:
-            item = CartItem.objects.get(cart=cart, product_id=product_id)
-            if quantity <= 0:
-                item.delete()
-            else:
-                item.quantity = quantity
-                item.save()
-        except CartItem.DoesNotExist:
-            return Response({'error': 'Item does not exist'}, status=404)
-
-        return Response(CartSerializer(cart).data)
-
 
 class DiscountApiView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsOwner]

@@ -7,7 +7,6 @@ from products.models import Product
 from .models import CartItem, Cart, CartDiscountUse
 
 class CartItemSerializer(serializers.ModelSerializer):
-    product = ProductSerializer(read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.filter(is_active=True, is_delete=False),
         write_only=True,
@@ -16,11 +15,11 @@ class CartItemSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = CartItem
-        fields = ('id', 'product', 'product_id', 'quantity', 'total_price')
-        read_only_fields = ('id', 'product_id', 'total_price')
+        fields = ('id', 'product_id', 'quantity', 'total_price')
+        read_only_fields = ('id', 'total_price')
 
 class CartSerializer(serializers.ModelSerializer):
-    items = CartItemSerializer(many=True, read_only=True)
+    items = CartItemSerializer(many=True)
     
     class Meta:
         model = Cart
