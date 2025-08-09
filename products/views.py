@@ -3,12 +3,13 @@ from rest_framework.generics import (
     RetrieveAPIView,
     CreateAPIView,
 )
+from rest_framework.views import APIView
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Prefetch, F
 
 from .serializers import ProductSerializer, ProductCommentSerializer
 from core.utils import get_client_ip
@@ -69,42 +70,56 @@ class ProductDetailAPIView(RetrieveAPIView):
         serializer = self.get_serializer(product)
         return Response(serializer.data)
     
-class ProductLikeCreateView(CreateAPIView):
+
+class ProductLikeToggleView(APIView):
     """
-    API view to like a product.
+    API view to like or unlike a product.
 
-    Allows authenticated users to like a product by its ID:
-    - Ensures a user can only like a specific product once.
-    - If the like already exists, returns an error response.
-    - On successful like, increments the product's like count.
+    This endpoint allows authenticated users to toggle their like status on a product:
+    - If the user has not liked the product yet, a like will be created.
+    - If the user has already liked the product, the like will be removed (unlike).
+    - Always returns the updated like status and the total like count for the product.
 
-    Like data is stored using the ProductLike model.
-    Only one like is recorded per unique combination of user and product.
+    Rules:
+    - Only authenticated users can access this endpoint.
+    - Each user can have at most one like per product.
+    - Like data is stored in the `ProductLike` model, ensuring uniqueness via a constraint.
+
+    Response JSON example:
+    {
+        "product_id": 42,
+        "liked": true,
+        "like_count": 15
+    }
     """
 
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def post(self, request, pk, *args, **kwargs):
         product = get_object_or_404(Product, pk=pk)
-        
-        like, created = ProductLike.objects.get_or_create(user=request.user, product=product)
-        if not created:
-            return Response(
-                {'detail': 'You have already like this product.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        like_qs = ProductLike.objects.filter(user=request.user, product=product)
+
+        if like_qs.exists():
+            like_qs.delete()
+            liked = False
+            like_count = product.like_count - 1
+        else:
+            ProductLike.objects.create(user=request.user, product=product)
+            liked = True
+            like_count = product.like_count + 1
             
-        product.like_count += 1
-        product.save(update_fields=['like_count'])
-        
+        product.like_count = like_count
+        product.save()
+
         return Response(
             {
-                'message': 'Product liked successfully.',
                 'product_id': product.id,
-                'likes': product.like_count
+                'liked': liked,
+                'like_count': like_count
             },
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_200_OK
         )
+
         
 
 class ProductCommentCreateView(CreateAPIView):
@@ -140,3 +155,47 @@ class ProductCommentCreateView(CreateAPIView):
     def perform_create(self, serializer):
         product_id = self.kwargs.get('pk')
         serializer.save(user=self.request.user, product_id=product_id)
+
+
+class LikedProductsListView(ListAPIView):
+    """
+    API view to retrieve all products liked by the authenticated user.
+
+    Features:
+    - Only authenticated users can access.
+    - Returns Product objects that the current user has liked.
+    - Optimized to avoid N+1 queries by:
+        * `select_related('category')` for category FK (if used in serializer).
+        * `prefetch_related('likes')` to load likes efficiently (if serializer uses it).
+
+    Queryset Notes:
+    - Filtering is done via `likes__user=self.request.user`.
+    - You can add ordering, filtering, and pagination via DRF settings.
+
+    Example response:
+    [
+        {
+            "id": 12,
+            "name": "Phone X",
+            "category": {"id": 3, "name": "Electronics"},
+            "like_count": 25
+        },
+        ...
+    ]
+    """
+
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Product.objects.filter(
+            likes__user=self.request.user
+        )
+
+        queryset = queryset.select_related('category')
+
+        queryset = queryset.prefetch_related(
+            Prefetch('likes', queryset=ProductLike.objects.select_related('user'))
+        )
+
+        return queryset
