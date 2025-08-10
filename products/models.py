@@ -65,6 +65,18 @@ class Product(BaseProduct):
     
     class Meta:
         ordering = ['-created_at']
+        
+    @property
+    def average_rating(self):
+        """Return the average rating for this product (0 if no ratings)."""
+        return round(
+            self.comments.filter(
+                rate__isnull=False,
+                is_active=True,
+                is_delete=False
+            ).aggregate(avg=models.Avg('rate'))['avg'] or 0,
+            1
+        )
 
 class ProductImage(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
@@ -98,6 +110,23 @@ class ProductComment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     is_delete = models.BooleanField(default=False)
+
+
+    class RatingChoices(models.IntegerChoices):
+        VERY_BAD = 1, 'Very Bad'
+        BAD = 2, 'Bad'
+        AVERAGE = 3, 'Average'
+        GOOD = 4, 'Good'
+        EXCELLENT = 5, 'Excellent'
+        
+    rate = models.PositiveSmallIntegerField(
+        choices=RatingChoices.choices,
+        default=RatingChoices.EXCELLENT,
+        help_text="Rate from 1 (Very Bad) to 5 (Excellent)"
+    )
+    
+    
+    
 
     def __str__(self):
         return Truncator(self.text).words(4, truncate='...')
