@@ -39,12 +39,14 @@ class TestProductApi:
         api_client.force_authenticate(user=user)
 
         res = api_client.post(url)
-        assert res.status_code == status.HTTP_201_CREATED
-        assert res.data['likes'] == 1
+        assert res.status_code == status.HTTP_200_OK
+        assert res.data['liked'] == True
+        assert res.data['like_count'] == 1
         
         res = api_client.post(url)
-        assert res.status_code == status.HTTP_400_BAD_REQUEST
-        assert res.data['detail'] == 'You have already like this product.'
+        assert res.status_code == status.HTTP_200_OK
+        assert res.data['liked'] == False
+        assert res.data['like_count'] == 0
         
     def test_unauthenticated_user_cannot_comment(self, api_client, product):
         url = reverse('product-comment', kwargs={'pk': product.id})
