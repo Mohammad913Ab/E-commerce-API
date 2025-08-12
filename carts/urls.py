@@ -7,5 +7,5 @@ router.register('carts', CartViewSet, 'cart')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('cart/discount/', DiscountApiView.as_view(), name='discount-view')
+    path('cart/discount/', DiscountApiView.as_view(), name='cart-discount')
 ]

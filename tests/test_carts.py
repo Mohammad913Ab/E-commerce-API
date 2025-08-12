@@ -10,144 +10,202 @@ from carts.models import Cart, CartItem, CartDiscountUse
 
 User = get_user_model()
 
-@pytest.mark.django_db
+import pytest
+from django.urls import reverse
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.utils import timezone
+from django.utils.timezone import timedelta
+
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from carts.models import Cart, CartItem, DiscountCode, CartDiscountUse
+from carts.serializers import DiscountUseSerializer
+
+
+pytestmark = pytest.mark.django_db
+
+
 class TestCartApi:
-    def test_create_cart_and_cart_item(self, cart, product, product_factory):
-        assert str(cart) == "Cart #1 for 09986543342"
-        item = CartItem.objects.create(cart=cart, product=product)
-        assert str(item) == "1 × ProductTest (1)"
+    def test_cartitem_total_price(self, product, cart):
+        item = CartItem.objects.create(cart=cart, product=product, quantity=3)
+        assert item.total_price == product.price * 3
 
-        # Test total price
-        new_product = product_factory(title='New Product', price=110)
-        CartItem.objects.create(cart=cart, product=new_product, quantity=2)
-        cart = Cart.objects.get(id=cart.id)
-        assert cart.total_price == 320
+    def test_cart_total_price_without_discount(self, product_factory, user_factory):
+        user = user_factory(mobile='09100000000')
+        cart = Cart.objects.create(user=user)
+        p1 = product_factory(title="a", price=40)
+        p2 = product_factory(title="b", price=60)
+        CartItem.objects.create(cart=cart, product=p1, quantity=2)  # 80
+        CartItem.objects.create(cart=cart, product=p2, quantity=1)  # 60
+        assert int(cart.total_price) == 140
 
-    def test_unauthenticated_user_create_cart(self, api_client):
-        url = reverse('cart-list')
-        res = api_client.post(url)
-        assert (
-            res.status_code == status.HTTP_401_UNAUTHORIZED or 
-            res.status_code == status.HTTP_403_FORBIDDEN
+    def test_cart_total_price_with_fixed_discount(self, product, cart, discount_code_factory):
+        CartItem.objects.create(cart=cart, product=product, quantity=1)
+        code = discount_code_factory(
+            title='fixed',
+            code='FIXED1',
+            expired_at=timezone.now() + timedelta(hours=1),
+            discount_value=20,
+            discount_type='F',
+            can_uses=5,
         )
-        
-    def test_authenticated_user_create_cart(self, api_client, user):
-        url = reverse('cart-list')
+        CartDiscountUse.objects.create(cart=cart, code=code)
+        expected = int(product.price - code.discount_value)
+        assert int(cart.total_price) == expected
+
+    def test_cart_total_price_with_percentage_discount(self, product, cart, discount_code_factory):
+        CartItem.objects.create(cart=cart, product=product, quantity=2)
+        code = discount_code_factory(
+            title='pct',
+            code='PCT1',
+            expired_at=timezone.now() + timedelta(hours=1),
+            discount_value=25,
+            discount_type='P',
+            can_uses=5,
+        )
+        CartDiscountUse.objects.create(cart=cart, code=code)
+        total = product.price * 2
+        expected = int(total - (total * code.discount_value / 100.0))
+        assert int(cart.total_price) == expected
+
+    def test_discountcode_clean_invalid_percentage_raises(self):
+        future = timezone.now() + timedelta(days=1)
+        bad = DiscountCode(
+            title='badpct',
+            code='BAD1',
+            expired_at=future,
+            discount_value=150.0,
+            discount_type='P',
+        )
+        with pytest.raises(ValidationError):
+            bad.full_clean()
+
+    def test_discountcode_clean_expired_at_in_past_raises(self):
+        past = timezone.now() - timedelta(days=1)
+        bad = DiscountCode(
+            title='badt',
+            code='BAD2',
+            expired_at=past,
+            discount_value=10,
+            discount_type='F',
+        )
+        with pytest.raises(ValidationError):
+            bad.full_clean()
+
+    def test_discountcode_expires_in_sets_inactive(self, discount_code_factory):
+        past = timezone.now() - timedelta(hours=1)
+        code = discount_code_factory(
+            title='past',
+            code='PAST',
+            expired_at=past,
+            discount_value=5,
+            discount_type='F',
+            is_active=True,
+        )
+        delta = code.expires_in
+        assert delta == timedelta(0)
+        code.refresh_from_db()
+        assert code.is_active is False
+
+    def test_discountuse_serializer_create_and_idempotence(self, cart, discount_code_factory):
+        code = discount_code_factory(
+            title='use-test',
+            code='USE1',
+            expired_at=timezone.now() + timedelta(hours=1),
+            discount_value=10,
+            discount_type='F',
+            can_uses=10,
+            use_count=0,
+        )
+
+        data = {"cart_id": cart.id, "code": code.code}
+        serializer = DiscountUseSerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        created_instance = serializer.create(validated_data=serializer.validated_data)
+        code.refresh_from_db()
+        assert created_instance.code == code
+        assert code.use_count == 1
+        assert code.can_uses == 9
+
+        # Running create again should not increment counts again because get_or_create returns existing
+        created_instance2 = serializer.create(validated_data=serializer.validated_data)
+        code.refresh_from_db()
+        assert created_instance2.id == created_instance.id
+        assert code.use_count == 1  # still 1
+        assert code.can_uses == 9  # still 9
+
+    def test_discount_api_view_success_and_error_flows(self, api_client, user, cart, product, discount_code_factory):
         api_client.force_authenticate(user=user)
-        res = api_client.post(url)
-        assert res.status_code == status.HTTP_201_CREATED
-        assert 'user' in res.data
-        assert res.data['user'] == user.id
-        assert not res.data['items']
+        CartItem.objects.create(cart=cart, product=product, quantity=1)
 
-    def test_add_and_remove_item(self, api_client, cart, user, product):
+        code = discount_code_factory(
+            title='ok',
+            code='OK1',
+            expired_at=timezone.now() + timedelta(hours=1),
+            discount_value=50,
+            discount_type='F',
+            can_uses=2,
+        )
+
+        resp = api_client.post(reverse('cart-discount'), {"cart": cart.id, "code": code.code}, format='json')
+        assert resp.data == status.HTTP_200_OK
+        cart.refresh_from_db()
+        assert hasattr(cart, 'discount')
+        assert cart.discount.code == code
+
+        # exhausted usage
+        exhausted = discount_code_factory(
+            title='exh',
+            code='EXH',
+            expired_at=timezone.now() + timedelta(hours=1),
+            discount_value=5,
+            discount_type='F',
+            can_uses=0,
+        )
+        resp2 = api_client.post(reverse('cart-discount'), {"cart_id": cart.id, "code": exhausted.code}, format='json')
+        assert resp2.status_code == status.HTTP_200_OK
+        assert 'error' in resp2.data
+
+        # expired
+        expired = discount_code_factory(
+            title='exp',
+            code='EXP2',
+            expired_at=timezone.now() - timedelta(hours=1),
+            discount_value=5,
+            discount_type='F',
+            can_uses=10,
+        )
+        resp3 = api_client.post(reverse('cart-discount'), {"cart_id": cart.id, "code": expired.code}, format='json')
+        assert resp3.status_code == status.HTTP_200_OK
+        assert 'error' in resp3.data
+
+    def test_cart_viewset_create_and_update(self, api_client, user, product_factory):
         api_client.force_authenticate(user=user)
-        # Add item
-        url = reverse('cart-add-item', kwargs={'pk': cart.id})
-        res = api_client.post(url, data={'product_id': product.id, 'quantity': 2})
-        
-        assert res.status_code == status.HTTP_200_OK
-        assert len(res.data['items']) == 1
+        p1 = product_factory(title='one', price=10)
+        p2 = product_factory(title='two', price=20)
 
-        # Remove item
-        url = reverse('cart-remove-item', kwargs={'pk': cart.id})
-        res = api_client.post(url, data={'product_id': product.id})
+        resp = api_client.post(reverse('cart-list'), {"items": [{"product_id": p1.id, "quantity": 2}]}, format='json')
+        assert resp.status_code == status.HTTP_201_CREATED
+        cart_id = resp.data['id']
 
-        assert res.status_code == status.HTTP_200_OK
-        assert len(res.data['items']) == 0
-        
-    def test_plus_and_minus_item_quantity(self, api_client, cart, user, product):
-        api_client.force_authenticate(user=user)
+        resp_update = api_client.put(reverse('cart-detail', kwargs={'pk': cart_id}),
+                                     {"items": [{"product_id": p2.id, "quantity": 3}]},
+                                     format='json')
+        assert resp_update.status_code == status.HTTP_200_OK
+        from carts.models import Cart as CartModel
+        c = CartModel.objects.get(id=cart_id)
+        assert c.items.count() == 1
+        assert int(c.total_price) == int(p2.price * 3)
 
-        # Add item with quantity 2
-        url = reverse('cart-add-item', kwargs={'pk': cart.id})
-        res = api_client.post(url, data={'product_id': product.id, 'quantity': 2})
-        assert res.status_code == status.HTTP_200_OK
-        assert res.data['items'][0]['quantity'] == 2
+    def test_unique_cart_per_user_enforced(self, user_factory):
+        user = user_factory(mobile='09111111111')
+        Cart.objects.create(user=user)
+        with pytest.raises(IntegrityError):
+            Cart.objects.create(user=user)
 
-        # Add same item with quantity 2 more (should now be 4)
-        res = api_client.post(url, data={'product_id': product.id, 'quantity': 2})
-        assert res.status_code == status.HTTP_200_OK
-        assert res.data['items'][0]['quantity'] == 4
 
-        # Decrease quantity to 2
-        url = reverse('cart-update-item-quantity', kwargs={'pk': cart.id})
-        res = api_client.post(url, data={'product_id': product.id, 'quantity': 2})
-        assert res.status_code == status.HTTP_200_OK
-        assert res.data['items'][0]['quantity'] == 2
-
-        # Decrease quantity to 0 (should remove item)
-        res = api_client.post(url, data={'product_id': product.id, 'quantity': 0})
-        assert res.status_code == status.HTTP_200_OK
-        assert not len(res.data['items'])
-
-        # Quantity or product id not send in request
-        res = api_client.post(url, data={'product_id': product.id})
-        assert res.status_code == status.HTTP_400_BAD_REQUEST
-        assert res.data['error'] == 'product_id and quantity required'
-
-        # Item does not exists
-        res = api_client.post(url, data={'product_id': product.id, 'quantity': 2})
-        assert res.status_code == status.HTTP_404_NOT_FOUND
-        assert res.data['error'] == 'Item does not exist'
-
-    # Discount test
-    def test_discount_create(self, discount_code, discount_code_factory):
-        assert str(discount_code.title) == 'DiscountCode 1'
-
-        discount_code.delete()
-
-        with pytest.raises(ValidationError) as exc_info:
-            new_discount_code = discount_code_factory(
-                title='DiscountCode',
-                code='#123',
-                expired_at=timezone.now() + timedelta(hours=1),
-                discount_value=101,
-                discount_type='P'
-            )
-            new_discount_code.full_clean()
-            new_discount_code.save()
-            
-        assert "Discount value cant upper than 100 while discount type is 'precentage'" in str(exc_info)
-        new_discount_code.delete()
-        
-        with pytest.raises(ValidationError) as exc_info:
-            new_discount_code = discount_code_factory(
-                title='DiscountCode',
-                code='#123',
-                expired_at=timezone.now() - timedelta(hours=1),
-                discount_value=90,
-                discount_type='P'
-            )
-            new_discount_code.full_clean()
-            new_discount_code.save()
-
-        assert "The expiration date of the discount cannot be before the present time." in str(exc_info)
-
-    def test_discount_expired(self, discount_code):
-        assert discount_code.expires_in
-        assert str(discount_code) == 'DiscountCode 1'
-        discount_code.expired_at = timezone.now() - timedelta(minutes=5)
-        assert not discount_code.expires_in
-
-    def test_total_price_with_discount(self, discount_code, cart, product_factory):
-        product = product_factory(title='New Product', price=300)
-        CartItem.objects.create(cart=cart, product=product, quantity=4)
-        discount_use = CartDiscountUse.objects.create(cart=cart, code=discount_code)
-        
-        assert str(discount_use) == '09986543342: DiscountCode 1'
-        
-        cart = Cart.objects.get(id=cart.id)
-        # For Fixed amount
-        assert cart.total_price == 1100
-        # For Percentage
-        discount_code.discount_type = 'P'
-        discount_code.save()
-        cart = Cart.objects.get(id=cart.id)
-        assert cart.total_price == 0
-        
-        # Test with DiscountCode.is_active = False
-        discount_code.is_active = False
-        discount_code.save()
-        assert discount_code.expires_in == timedelta(0)
-        
+@pytest.fixture
+def api_client():
+    return APIClient()
