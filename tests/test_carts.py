@@ -149,8 +149,8 @@ class TestCartApi:
             can_uses=2,
         )
 
-        resp = api_client.post(reverse('cart-discount'), {"cart": cart.id, "code": code.code}, format='json')
-        assert resp.data == status.HTTP_200_OK
+        resp = api_client.post(reverse('cart-discount'), {"cart_id": cart.id, "code": code.code}, format='json')
+        assert resp.status_code == status.HTTP_200_OK
         cart.refresh_from_db()
         assert hasattr(cart, 'discount')
         assert cart.discount.code == code
@@ -204,8 +204,3 @@ class TestCartApi:
         Cart.objects.create(user=user)
         with pytest.raises(IntegrityError):
             Cart.objects.create(user=user)
-
-
-@pytest.fixture
-def api_client():
-    return APIClient()
