@@ -106,6 +106,7 @@ AUTHENTICATION_BACKENDS = [
 
 # DRF settings
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
@@ -136,3 +137,11 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
     "/var/www/static/",
 ]
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SHOP API',
+    'DESCRIPTION': 'Shop api',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
